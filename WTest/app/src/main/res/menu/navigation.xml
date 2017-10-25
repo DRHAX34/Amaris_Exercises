@@ -1,14 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <item android:id="@+id/navigation_home" android:icon="@drawable/ic_home_black_24dp"
-        android:title="@string/title_home" />
+    <item
+        android:id="@+id/navigation_exercise_1"
+        android:icon="@drawable/ic_edit_black_24dp"
+        android:title="@string/title_first_exercise" />
 
-    <item android:id="@+id/navigation_dashboard" android:icon="@drawable/ic_dashboard_black_24dp"
-        android:title="@string/title_dashboard" />
+    <item
+        android:id="@+id/navigation_exercise_2"
+        android:icon="@drawable/ic_edit_black_24dp"
+        android:title="@string/title_second_exercise" />
 
-    <item android:id="@+id/navigation_notifications"
-        android:icon="@drawable/ic_notifications_black_24dp"
-        android:title="@string/title_notifications" />
+    <item
+        android:id="@+id/navigation_exercise_3"
+        android:icon="@drawable/ic_edit_black_24dp"
+        android:title="@string/title_third_exercise" />
+
+    <item
+        android:id="@+id/navigation_exercise_4"
+        android:icon="@drawable/ic_edit_black_24dp"
+        android:title="@string/title_fourth_exercise" />
 
 </menu>

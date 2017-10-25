@@ -1,6 +1,12 @@
 <resources>
-    <string name="app_name">WTest</string>
-    <string name="title_home">Home</string>
-    <string name="title_dashboard">Dashboard</string>
-    <string name="title_notifications">Notifications</string>
+    <string name="app_name">WTest - Default Flavor</string>
+    <string name="title_first_exercise">Exercise 1</string>
+    <string name="title_second_exercise">Exercise 2</string>
+    <string name="title_third_exercise">Exercise 3</string>
+    <string name="title_fourth_exercise">Exercise 4</string>
+    <string name="no_layout_specified">No layout was specified</string>
+
+    <string name="third_exercise_normal">Normal Text</string>
+    <string name="third_exercise_numeric">Numeric</string>
+    <string name="third_exercise_all_caps">All Caps Text</string>
 </resources>

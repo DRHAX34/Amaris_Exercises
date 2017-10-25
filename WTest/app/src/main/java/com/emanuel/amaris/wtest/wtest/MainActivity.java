@@ -1,12 +1,19 @@
 package com.emanuel.amaris.wtest.wtest;
 
+import android.content.Context;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.BottomNavigationView;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.Toolbar;
 import android.view.MenuItem;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 
 import com.emanuel.amaris.wtest.wtest.Fragments.AppFragment;
 import com.emanuel.amaris.wtest.wtest.Fragments.FragmentExercise1;
@@ -21,6 +28,7 @@ public class MainActivity extends AppCompatActivity {
     private final String CURRENT_FRAGMENT = "currentFragment";
 
     FragmentManager fragmentManager;
+    Toolbar toolbar;
 
     private BottomNavigationView.OnNavigationItemSelectedListener mOnNavigationItemSelectedListener
             = new BottomNavigationView.OnNavigationItemSelectedListener() {
@@ -51,8 +59,34 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        toolbar = (Toolbar) findViewById(R.id.toolbar);
         navigation = (BottomNavigationView) findViewById(R.id.navigation);
         navigation.setOnNavigationItemSelectedListener(mOnNavigationItemSelectedListener);
+        if (savedInstanceState != null) {
+            switch (savedInstanceState.getInt(CURRENT_FRAGMENT)) {
+                case 0:
+                    navigation.setSelectedItemId(R.id.navigation_exercise_1);
+                    break;
+                case 1:
+                    navigation.setSelectedItemId(R.id.navigation_exercise_1);
+                    break;
+                case 2:
+                    navigation.setSelectedItemId(R.id.navigation_exercise_1);
+                    break;
+                case 3:
+                    navigation.setSelectedItemId(R.id.navigation_exercise_1);
+                    break;
+            }
+        } else {
+            navigation.setSelectedItemId(R.id.navigation_exercise_1);
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        navigation.setSelectedItemId(navigation.getSelectedItemId());
     }
 
     private FragmentManager getAppFragmentManager() {
@@ -83,6 +117,24 @@ public class MainActivity extends AppCompatActivity {
             default:
                 return null;
         }
+    }
+
+    //Catch all the touch events from every view, if it's a EditText that currently has the touch focus, remove the focus.
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            View v = getCurrentFocus();
+            if (v instanceof EditText) {
+                Rect outRect = new Rect();
+                v.getGlobalVisibleRect(outRect);
+                if (!outRect.contains((int) event.getRawX(), (int) event.getRawY())) {
+                    v.clearFocus();
+                    InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                    imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+                }
+            }
+        }
+        return super.dispatchTouchEvent(event);
     }
 
 }

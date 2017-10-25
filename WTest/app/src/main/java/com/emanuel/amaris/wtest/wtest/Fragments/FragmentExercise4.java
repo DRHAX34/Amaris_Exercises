@@ -6,7 +6,9 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import com.emanuel.amaris.wtest.wtest.BuildConfig;
+import com.emanuel.amaris.wtest.wtest.MainActivity;
 import com.emanuel.amaris.wtest.wtest.R;
+import com.emanuel.amaris.wtest.wtest.WTestApplication;
 
 
 public class FragmentExercise4 extends AppFragment {
@@ -15,6 +17,8 @@ public class FragmentExercise4 extends AppFragment {
 
     private WebView fragmentWebView;
     private WebViewClient webviewClient;
+
+    WTestApplication app;
 
     public FragmentExercise4() {
     }
@@ -28,10 +32,22 @@ public class FragmentExercise4 extends AppFragment {
     @Override
     public void onViewAvailable(Bundle savedInstanceState) {
         fragmentWebView = getFragmentView().findViewById(R.id.exercise_4_webview);
+
+        Bundle webState = null;
+
+        if (getContext() != null) {
+            MainActivity activity = (MainActivity) getContext();
+            app = (WTestApplication) activity.getApplication();
+            webState = app.getWebStateBundle();
+        }
+
         if (webviewClient == null) {
             webviewClient = new WebViewClient();
             fragmentWebView.setWebViewClient(new WebViewClient());
-            fragmentWebView.loadUrl(BuildConfig.WEBSITE_TO_SHOW);
+            if (webState == null)
+                fragmentWebView.loadUrl(BuildConfig.WEBSITE_TO_SHOW);
+            else
+                fragmentWebView.restoreState(webState);
         }
     }
 
@@ -39,6 +55,14 @@ public class FragmentExercise4 extends AppFragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRetainInstance(true);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        Bundle webstate = new Bundle();
+        fragmentWebView.saveState(webstate);
+        app.setWebStateBundle(webstate);
     }
 
     @Override

@@ -60,9 +60,12 @@ public abstract class AppFragment extends Fragment {
             layoutToInflate = R.layout.layout_not_specified;
         }
 
-        setFragmentView(inflater.inflate(layoutToInflate, container, false));
+        View fragmentView = inflater.inflate(layoutToInflate, container, false);
+        setFragmentView(fragmentView);
 
-        onViewAvailable(savedInstanceState);
+        if (fragmentView != null) {
+            onViewAvailable(savedInstanceState);
+        }
 
         return getFragmentView();
     }

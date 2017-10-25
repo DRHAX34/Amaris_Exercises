@@ -2,9 +2,14 @@ package com.emanuel.amaris.wtest.wtest.Adapters;
 
 import android.content.Context;
 import android.support.design.widget.TextInputEditText;
+import android.support.design.widget.TextInputLayout;
 import android.support.v7.widget.RecyclerView;
 import android.text.Editable;
+import android.text.InputFilter;
+import android.text.InputType;
+import android.text.Spanned;
 import android.text.TextWatcher;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
@@ -12,6 +17,7 @@ import android.widget.TextView;
 
 import com.emanuel.amaris.wtest.wtest.R;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -20,79 +26,176 @@ import java.util.List;
 
 public class ExerciseAdapter extends RecyclerView.Adapter {
 
-    public static final int VIEW_TYPE_DIVISOR = 1;
-    public static final int VIEW_TYPE_TEXT = 2;
+    public static final int VIEW_TYPE_TEXT = 1;
+    public static final int VIEW_TYPE_LOADING = 2;
+    public static final int VIEW_TYPE_NO_DATA = 3;
+    public static final int VIEW_TYPE_PLACEHOLDER = 4;
 
-    private int itemCount = 0;
     private Context recyclerContext;
 
     private List<itemTemplate> adapterContent;
 
+    private boolean isLoadingData;
+    private String loadingString;
+
     public ExerciseAdapter(Context context) {
         this.recyclerContext = context;
-    }
-
-    public ExerciseAdapter(Context context, List<itemTemplate> content) {
-        this.recyclerContext = context;
-        this.adapterContent = content;
+        this.adapterContent = new ArrayList<>();
     }
 
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         switch (viewType) {
-            case VIEW_TYPE_DIVISOR:
-                View divisorView = View.inflate(recyclerContext, R.layout.list_item_divisor, parent);
-                return new DivisorViewHolder(divisorView);
+            case VIEW_TYPE_LOADING:
+                View loadingView = LayoutInflater.from(recyclerContext).inflate(R.layout.list_item_loading, parent, false);
+                return new LoadingViewHolder(loadingView);
+            case VIEW_TYPE_NO_DATA:
             case VIEW_TYPE_TEXT:
             default:
-                View layoutView = View.inflate(recyclerContext, R.layout.list_item_layout, parent);
+                View layoutView = LayoutInflater.from(recyclerContext).inflate(R.layout.list_item_layout, parent, false);
                 return new ExerciseViewHolder(layoutView);
         }
     }
 
     @Override
     public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
-        if (adapterContent.get(position).getViewType() == VIEW_TYPE_DIVISOR) {
-            DivisorViewHolder divisorHolder = (DivisorViewHolder) holder;
-
-            divisorHolder.divisorText.setText(adapterContent.get(position).getDivisorTitle());
-        } else {
+        if (adapterContent.size() == 0 && !isLoadingData) {
             ExerciseViewHolder exerciseHolder = (ExerciseViewHolder) holder;
 
-            exerciseHolder.itemText.setText(adapterContent.get(position).getContentToShow());
-            if (adapterContent.get(position).shouldShowEditText()) {
-                exerciseHolder.itemEditListener.updateItem(adapterContent.get(position));
-                exerciseHolder.itemEdit.setText(adapterContent.get(position).getContentBeingEdited());
-                exerciseHolder.itemEdit.setVisibility(TextInputEditText.VISIBLE);
+            exerciseHolder.itemText.setText(recyclerContext.getString(R.string.no_data_loaded));
+
+            exerciseHolder.itemEdit.setVisibility(TextInputEditText.GONE);
+            exerciseHolder.itemEditListener.updateItem(null);
+            return;
+        } else if (isLoadingData) {
+            LoadingViewHolder loadingHolder = (LoadingViewHolder) holder;
+            if (loadingString != null && !loadingString.isEmpty()) {
+                loadingHolder.progressText.setText(loadingString);
+                loadingHolder.progressText.setVisibility(TextView.VISIBLE);
             } else {
-                exerciseHolder.itemEdit.setVisibility(TextInputEditText.GONE);
-                exerciseHolder.itemEditListener.updateItem(null);
+                loadingHolder.progressText.setVisibility(TextView.GONE);
             }
+            return;
+        }
+
+        switch (adapterContent.get(position).getViewType()) {
+            case VIEW_TYPE_TEXT:
+                ExerciseViewHolder exerciseHolder = (ExerciseViewHolder) holder;
+
+                exerciseHolder.itemText.setText(adapterContent.get(position).getContentToShow());
+                if (adapterContent.get(position).shouldShowEditText()) {
+                    switch (adapterContent.get(position).getContentType()) {
+                        case itemTemplate.CONTENT_NORMAL:
+                            //Only Accept Text
+                            exerciseHolder.itemEdit.setFilters(new InputFilter[]{new InputFilter() {
+                                public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                                    String filtered = "";
+                                    for (int i = start; i < end; i++) {
+                                        char character = source.charAt(i);
+                                        if (!Character.isWhitespace(character) && Character.isLetter(character)) {
+                                            filtered += character;
+                                        }
+                                    }
+                                    return filtered;
+                                }
+                            }});
+                            exerciseHolder.itemEdit.setInputType(InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_CLASS_TEXT);
+                            break;
+                        case itemTemplate.CONTENT_NUMERIC:
+                            exerciseHolder.itemEdit.setFilters(new InputFilter[]{});
+                            exerciseHolder.itemEdit.setInputType(InputType.TYPE_CLASS_NUMBER);
+                            break;
+                        case itemTemplate.CONTENT_ALL_CAPS:
+                            //Use Android native ALL CAPS filter and use a new InputFilter to only accept Text
+                            exerciseHolder.itemEdit.setFilters(new InputFilter[]{new InputFilter.AllCaps(), new InputFilter() {
+                                public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                                    String filtered = "";
+                                    for (int i = start; i < end; i++) {
+                                        char character = source.charAt(i);
+                                        if (!Character.isWhitespace(character) && Character.isLetter(character)) {
+                                            filtered += character;
+                                        }
+                                    }
+                                    return filtered;
+                                }
+                            }});
+
+                            exerciseHolder.itemEdit.setInputType(InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS | InputType.TYPE_CLASS_TEXT);
+                            break;
+                    }
+                    exerciseHolder.itemEditListener.updateItem(adapterContent.get(position));
+                    exerciseHolder.itemEdit.setText(adapterContent.get(position).getContentBeingEdited());
+                    exerciseHolder.itemEditLayout.setVisibility(TextInputLayout.VISIBLE);
+                } else {
+                    exerciseHolder.itemEditLayout.setVisibility(TextInputLayout.GONE);
+                    exerciseHolder.itemEditListener.updateItem(null);
+                }
+                break;
+            case VIEW_TYPE_LOADING:
+                LoadingViewHolder loadingHolder = (LoadingViewHolder) holder;
+                loadingHolder.progressText.setVisibility(TextView.VISIBLE);
+                loadingHolder.progressText.setText(R.string.pls_wait_data_loading);
+                //Do nothing
         }
     }
 
     @Override
     public int getItemViewType(int position) {
+        if (isLoadingData) {
+            return VIEW_TYPE_LOADING;
+        }
+
+        if (adapterContent.size() == 0) {
+            return VIEW_TYPE_NO_DATA;
+        }
+
         return adapterContent.get(position).getViewType();
     }
 
     @Override
     public int getItemCount() {
+        if (isLoadingData) {
+            return 1;
+        }
+
+        if (adapterContent.size() == 0) {
+            return 1;
+        }
+
         return adapterContent.size();
+    }
+
+    public void setLoading(boolean loading) {
+        this.isLoadingData = loading;
+        notifyDataSetChanged();
+    }
+
+    public void setLoadingString(String loading) {
+        this.loadingString = loading;
+        notifyDataSetChanged();
+    }
+
+    public boolean isLoading() {
+        return this.isLoadingData;
     }
 
     public List<itemTemplate> getAdapterContent() {
         return adapterContent;
     }
 
-    public void setAdapterContent(List<itemTemplate> adapterContent) {
+    public void setAdapterContent(List<itemTemplate> adapterContent, boolean resetScroll) {
         this.adapterContent = adapterContent;
+        if (resetScroll)
+            notifyDataSetChanged();
+        else
+            notifyItemRangeChanged(0, this.adapterContent.size());
     }
 
     public class ExerciseViewHolder extends RecyclerView.ViewHolder {
 
         TextView itemText;
         EditText itemEdit;
+        TextInputLayout itemEditLayout;
 
         ItemEditTextChangedListener itemEditListener;
 
@@ -103,6 +206,7 @@ public class ExerciseAdapter extends RecyclerView.Adapter {
             if (itemView != null) {
                 itemText = itemView.findViewById(R.id.item_text);
                 itemEdit = itemView.findViewById(R.id.item_edit);
+                itemEditLayout = itemView.findViewById(R.id.item_edit_layout);
 
                 itemEditListener = new ItemEditTextChangedListener();
                 itemEdit.addTextChangedListener(itemEditListener);
@@ -135,25 +239,26 @@ public class ExerciseAdapter extends RecyclerView.Adapter {
         }
     }
 
-    public class DivisorViewHolder extends RecyclerView.ViewHolder {
+    public class LoadingViewHolder extends RecyclerView.ViewHolder {
 
-        TextView divisorText;
+        TextView progressText;
 
-        public DivisorViewHolder(View itemView) {
+        public LoadingViewHolder(View itemView) {
             super(itemView);
 
-            if (itemView != null) {
-                divisorText = itemView.findViewById(R.id.text_divisor);
-                divisorText.setAllCaps(true);
-            }
+            progressText = itemView.findViewById(R.id.progress_text);
         }
     }
 
-    public class itemTemplate {
+    public static class itemTemplate {
 
-        private String divisorTitle;
+        public final static int CONTENT_NORMAL = 0;
+        public final static int CONTENT_NUMERIC = 1;
+        public final static int CONTENT_ALL_CAPS = 2;
+
         private String contentToShow;
         private String contentBeingEdited;
+        private int contentType = -1;
         private boolean shouldShowEditText = false;
         private int viewType;
 
@@ -163,14 +268,6 @@ public class ExerciseAdapter extends RecyclerView.Adapter {
 
         public void setShowEditText(boolean shouldShowEditText) {
             this.shouldShowEditText = shouldShowEditText;
-        }
-
-        public String getDivisorTitle() {
-            return divisorTitle;
-        }
-
-        public void setDivisorTitle(String divisorTitle) {
-            this.divisorTitle = divisorTitle;
         }
 
         public String getContentToShow() {
@@ -187,6 +284,14 @@ public class ExerciseAdapter extends RecyclerView.Adapter {
 
         public void setContentBeingEdited(String contentBeingEdited) {
             this.contentBeingEdited = contentBeingEdited;
+        }
+
+        public int getContentType() {
+            return contentType;
+        }
+
+        public void setContentType(int contentType) {
+            this.contentType = contentType;
         }
 
         public int getViewType() {

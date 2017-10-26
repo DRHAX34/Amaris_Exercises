@@ -22,7 +22,7 @@ import java.net.URL;
 
 public class ImageManager {
 
-    public final String IMAGE_URL = "https://i.ytimg.com/vi/yaqe1qesQ8c/maxresdefault.jpg";
+    public final String IMAGE_URL = "https://i.stack.imgur.com/dqZo3.jpg";
 
     private ImageEventListener listener;
 

@@ -16,6 +16,7 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import com.emanuel.amaris.wtest.wtest.Adapters.ExerciseAdapter;
+import com.emanuel.amaris.wtest.wtest.MainActivity;
 import com.emanuel.amaris.wtest.wtest.R;
 import com.emanuel.amaris.wtest.wtest.WebCode.ImageManager;
 
@@ -142,6 +143,24 @@ public class FragmentExercise2 extends AppFragment {
             //... and set them to our Adapter
             fragmentRecyclerView.setAdapter(recyclerAdapter);
             recyclerAdapter.setAdapterContent(itemsToShow, false);
+
+            fragmentRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+
+                private int firstVisibleInListview = 0;
+
+                @Override
+                public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+                    super.onScrolled(recyclerView, dx, dy);
+
+                    int currentFirstVisible = ((LinearLayoutManager) fragmentRecyclerView.getLayoutManager()).findFirstVisibleItemPosition();
+
+                    if (currentFirstVisible == firstVisibleInListview)
+                        ((MainActivity) getContext()).changeToolbarVisibility(false);
+                    else
+                        ((MainActivity) getContext()).changeToolbarVisibility(true);
+
+                }
+            });
 
         }
     }

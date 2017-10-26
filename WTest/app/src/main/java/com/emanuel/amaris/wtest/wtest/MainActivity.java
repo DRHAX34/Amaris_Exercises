@@ -1,5 +1,8 @@
 package com.emanuel.amaris.wtest.wtest;
 
+import android.animation.Animator;
+import android.animation.ObjectAnimator;
+import android.animation.PropertyValuesHolder;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Color;
@@ -35,6 +38,8 @@ public class MainActivity extends AppCompatActivity {
 
     Toolbar toolbar;
 
+    boolean toolbarIsDisappearing;
+
     AlphaAnimation animation1;
 
     ValueAnimator anim;
@@ -50,6 +55,7 @@ public class MainActivity extends AppCompatActivity {
                 case R.id.navigation_exercise_1:
                     setFragmentTo(FragmentExercise1.FRAGMENT_TAG);
                     toolbar.setBackgroundColor(getResources().getColor(R.color.colorPrimary));
+                    changeToolbarVisibility(true);
                     return true;
                 case R.id.navigation_exercise_2:
                     setFragmentTo(FragmentExercise2.FRAGMENT_TAG);
@@ -59,10 +65,12 @@ public class MainActivity extends AppCompatActivity {
                 case R.id.navigation_exercise_3:
                     setFragmentTo(FragmentExercise3.FRAGMENT_TAG);
                     toolbar.setBackgroundColor(getResources().getColor(R.color.colorPrimary));
+                    changeToolbarVisibility(true);
                     return true;
                 case R.id.navigation_exercise_4:
                     setFragmentTo(FragmentExercise4.FRAGMENT_TAG);
                     toolbar.setBackgroundColor(getResources().getColor(R.color.colorPrimary));
+                    changeToolbarVisibility(true);
                     return true;
             }
             return false;
@@ -79,7 +87,6 @@ public class MainActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         navigation = (BottomNavigationView) findViewById(R.id.navigation);
         navigation.setOnNavigationItemSelectedListener(mOnNavigationItemSelectedListener);
-        navigation.setSelectedItemId(R.id.navigation_exercise_1);
     }
 
     @Override
@@ -135,6 +142,118 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         return super.dispatchTouchEvent(event);
+    }
+
+    public void changeToolbarVisibility(boolean show) {
+        AlphaAnimation animation;
+
+        if (show) {
+            if (toolbarIsDisappearing) {
+                ObjectAnimator animator = ObjectAnimator
+                        .ofPropertyValuesHolder(toolbar.getBackground(),
+                                PropertyValuesHolder.ofInt("alpha", toolbar.getBackground().getAlpha(), 255));
+                animator.setTarget(toolbar.getBackground());
+                animator.setDuration(200);
+                animator.addListener(new Animator.AnimatorListener() {
+                    @Override
+                    public void onAnimationStart(Animator animator) {
+                        final float[] from = new float[3],
+                                to = new float[3];
+
+                        Color.colorToHSV(Color.WHITE, from);   // from white
+                        Color.colorToHSV(Color.BLACK, to);     // to red
+
+                        ValueAnimator anim = ValueAnimator.ofFloat(0, 1);   // animate from 0 to 1
+                        anim.setDuration(200);                              // for 300 ms
+
+                        final float[] hsv = new float[3];                  // transition color
+                        anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                            @Override
+                            public void onAnimationUpdate(ValueAnimator animation) {
+                                // Transition along each axis of HSV (hue, saturation, value)
+                                hsv[0] = from[0] + (to[0] - from[0]) * animation.getAnimatedFraction();
+                                hsv[1] = from[1] + (to[1] - from[1]) * animation.getAnimatedFraction();
+                                hsv[2] = from[2] + (to[2] - from[2]) * animation.getAnimatedFraction();
+
+                                toolbar.setTitleTextColor(Color.HSVToColor(hsv));
+                            }
+                        });
+
+                        anim.start();
+                    }
+
+                    @Override
+                    public void onAnimationEnd(Animator animator) {
+
+                    }
+
+                    @Override
+                    public void onAnimationCancel(Animator animator) {
+
+                    }
+
+                    @Override
+                    public void onAnimationRepeat(Animator animator) {
+
+                    }
+                });
+                animator.start();
+                toolbarIsDisappearing = false;
+            }
+        } else {
+            if (!toolbarIsDisappearing) {
+                ObjectAnimator animator = ObjectAnimator
+                        .ofPropertyValuesHolder(toolbar.getBackground(),
+                                PropertyValuesHolder.ofInt("alpha", toolbar.getBackground().getAlpha(), 0));
+                animator.setTarget(toolbar.getBackground());
+                animator.setDuration(200);
+                animator.addListener(new Animator.AnimatorListener() {
+                    @Override
+                    public void onAnimationStart(Animator animator) {
+                        final float[] from = new float[3],
+                                to = new float[3];
+
+                        Color.colorToHSV(Color.BLACK, from);   // from white
+                        Color.colorToHSV(Color.WHITE, to);     // to red
+
+                        ValueAnimator anim = ValueAnimator.ofFloat(0, 1);   // animate from 0 to 1
+                        anim.setDuration(200);                              // for 300 ms
+
+                        final float[] hsv = new float[3];                  // transition color
+                        anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                            @Override
+                            public void onAnimationUpdate(ValueAnimator animation) {
+                                // Transition along each axis of HSV (hue, saturation, value)
+                                hsv[0] = from[0] + (to[0] - from[0]) * animation.getAnimatedFraction();
+                                hsv[1] = from[1] + (to[1] - from[1]) * animation.getAnimatedFraction();
+                                hsv[2] = from[2] + (to[2] - from[2]) * animation.getAnimatedFraction();
+
+                                toolbar.setTitleTextColor(Color.HSVToColor(hsv));
+                            }
+                        });
+
+                        anim.start();
+                    }
+
+                    @Override
+                    public void onAnimationEnd(Animator animator) {
+
+                    }
+
+                    @Override
+                    public void onAnimationCancel(Animator animator) {
+
+                    }
+
+                    @Override
+                    public void onAnimationRepeat(Animator animator) {
+
+                    }
+                });
+                animator.start();
+                toolbarIsDisappearing = true;
+            }
+        }
     }
 
 }

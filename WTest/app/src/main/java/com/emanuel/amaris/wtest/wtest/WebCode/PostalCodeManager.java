@@ -36,6 +36,7 @@ public class PostalCodeManager {
     //Necessary constants
     private final String GITHUB_URL = "https://github.com/centraldedados/codigos_postais";
     private final String RESOURCE_NAME = "codigos_postais";
+    private final int UPDATE_INTERVAL = 10;
 
     //Properties
     protected Handler uiThread;
@@ -60,6 +61,12 @@ public class PostalCodeManager {
 
     public int counter;
 
+    private final Object threadLock = new Object();
+    private final Object threadA = new Object();
+    private final Object threadB = new Object();
+    private final Object threadC = new Object();
+    private boolean[] threadFinished = {false, false, false};
+
     private PostalCodeManager(Context context) {
         this.context = context;
     }
@@ -70,11 +77,19 @@ public class PostalCodeManager {
     //Also, since this is accessing the db and we do not want to constantly reinstanciate the DB connection, we call this method to only get
     //a single Instance
     public static PostalCodeManager getInstance(Context context, PostalCodeEventListener listener) {
+        boolean startLoadingData = false;
         if (manager == null) {
             manager = new PostalCodeManager(context);
+            Log.d("PostalCodeManager", "Instantiate PostalCodeManager");
+            startLoadingData = true;
         }
+
         manager.setPostalCodeEventListener(listener);
         manager.uiThread = new Handler(Looper.getMainLooper());
+
+        if (startLoadingData) {
+            manager.loadPostalCodes(0);
+        }
 
         return manager;
     }
@@ -98,6 +113,8 @@ public class PostalCodeManager {
 
         taskWeb.isFirstStart = firstTime;
 
+        counter = 0;
+
         taskWeb.execute(GITHUB_URL);
     }
 
@@ -115,14 +132,10 @@ public class PostalCodeManager {
     }
 
     //Method executed by activities/fragments
-    public void loadPostalCodes(boolean forceLoadFromWeb, final int indexToStart) {
-        if ((taskDb == null || !taskDb.isRunning) && (taskWeb == null || !taskWeb.isRunning)) {
-            if (forceLoadFromWeb) {
-                forceLoadPostalCodes(false);
-            } else {
+    public void loadPostalCodes(final int indexToStart) {
+        if (taskWeb == null || !taskWeb.isRunning) {
                 taskDb = new GetPostalCodesFromDb();
                 taskDb.execute(indexToStart);
-            }
         } else {
             uiThread.post(new Runnable() {
                 @Override
@@ -148,7 +161,6 @@ public class PostalCodeManager {
             wtestDbWritable.delete(WTestDbContract.WTestDbEntry.TABLE_NAME, "", null);
         }
 
-        ContentValues values = new ContentValues();
         int indexPlace = -1;
         int firstPostalCode = -1;
         int secondPostalCode = -1;
@@ -156,57 +168,233 @@ public class PostalCodeManager {
         //For audit puposes
         counter = 0;
         itemCount = lines.size();
-        int progressUpdateCounter = 0;
 
-        //Insert new values on the db
-        for (String postalCode : lines) {
-            String[] columns = postalCode.split(",");
-            if (columns.length == 0) {
-                columns = postalCode.toString().split(";");
-            }
+        String[] columns = lines.get(0).split(",");
+        if (columns.length == 0) {
+            columns = lines.get(0).toString().split(";");
+        }
 
-            if (indexPlace != -1) {
-                values.put(WTestDbContract.WTestDbEntry.COLUMN_VALUE, columns[firstPostalCode] + "-" + columns[secondPostalCode]);
-                values.put(WTestDbContract.WTestDbEntry.COLUMN_LOCAL, columns[indexPlace]);
-                values.put(WTestDbContract.WTestDbEntry.COLUMN_LOCAL_ASCII, Normalizer.normalize(columns[indexPlace], Normalizer.Form.NFD)
-                        .replaceAll("[^\\p{ASCII}]", ""));
-                try {
-                    wtestDbWritable.insert(WTestDbContract.WTestDbEntry.TABLE_NAME, null, values);
-                    counter++;
-                } catch (IllegalStateException exception) {
-                    //Try to re-open the db helper again
-                    wtestDbWritable = getDbHelper().getWritableDatabase();
-                    wtestDbWritable.insert(WTestDbContract.WTestDbEntry.TABLE_NAME, null, values);
-                }
-                values.clear();
-                counter++;
-                progressUpdateCounter++;
-
-                if (listener != null && progressUpdateCounter == 250) {
-                    uiThread.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            listener.onProgressUpdate(counter, itemCount);
-                        }
-                    });
-                    progressUpdateCounter = 0;
-                }
-
-            } else {
-                for (int j = 0; j < columns.length; ++j) {
-                    //Search the header for the positions of each data we need
-                    if (columns[j].equals("localidade")) {
-                        indexPlace = j;
-                    } else if (columns[j].equals("cod_postal")) {
-                        firstPostalCode = j;
-                    } else if (columns[j].equals("extensao_cod_postal")) {
-                        secondPostalCode = j;
-                    }
-                }
+        for (int j = 0; j < columns.length; ++j) {
+            //Search the header for the positions of each data we need
+            if (columns[j].equals("localidade")) {
+                indexPlace = j;
+            } else if (columns[j].equals("cod_postal")) {
+                firstPostalCode = j;
+            } else if (columns[j].equals("extensao_cod_postal")) {
+                secondPostalCode = j;
             }
         }
 
-        Log.d("DbWTest", "inserted in database successfully");
+        final int indexPlaceFinal = indexPlace;
+        final int firstPostalCodeFinal = firstPostalCode;
+        final int secondPostalCodeFinal = secondPostalCode;
+
+        threadFinished = new boolean[]{false, false, false};
+
+        final List<String> itemsToAddPart1 = lines.subList(1, (itemCount / 3) - 1);
+        final List<String> itemsToAddPart2 = lines.subList(itemCount / 3, ((itemCount / 3) * 2) - 1);
+        final List<String> itemsToAddPart3 = lines.subList(((itemCount / 3) * 2), itemCount - 1);
+
+        Thread thread1 = new Thread() {
+            @Override
+            public void run() {
+                super.run();
+
+                synchronized (threadA) {
+                    ContentValues values = new ContentValues();
+                    int progressUpdateCounter = 0;
+
+                    //Insert new values on the db
+                    for (int i = 0; i < itemsToAddPart1.size(); ++i) {
+                        String postalCode = itemsToAddPart1.get(i);
+
+                        String[] columns = postalCode.split(",");
+                        if (columns.length == 0) {
+                            columns = postalCode.toString().split(";");
+                        }
+
+                        if (indexPlaceFinal != -1) {
+                            values.put(WTestDbContract.WTestDbEntry.COLUMN_VALUE, columns[firstPostalCodeFinal] + "-" + columns[secondPostalCodeFinal]);
+                            values.put(WTestDbContract.WTestDbEntry.COLUMN_LOCAL, columns[indexPlaceFinal]);
+                            values.put(WTestDbContract.WTestDbEntry.COLUMN_LOCAL_ASCII, Normalizer.normalize(columns[indexPlaceFinal], Normalizer.Form.NFD)
+                                    .replaceAll("[^\\p{ASCII}]", ""));
+
+                            wtestDbWritable.insert(WTestDbContract.WTestDbEntry.TABLE_NAME, null, values);
+                            values.clear();
+                            counter++;
+                            progressUpdateCounter++;
+
+                            if (listener != null && progressUpdateCounter == UPDATE_INTERVAL) {
+                                uiThread.post(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        listener.onProgressUpdate(counter, itemCount);
+                                    }
+                                });
+                                progressUpdateCounter = 0;
+                            }
+                        }
+                    }
+                }
+                synchronized (threadB) {
+                    synchronized (threadC) {
+                        threadFinished[0] = true;
+
+                        Log.d("DbWTest", "Thread 1 finished");
+
+                        if (threadFinished[0] && threadFinished[1] && threadFinished[2]) {
+                            if (taskWeb != null) {
+                                taskWeb.isRunning = false;
+                            }
+                            uiThread.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    loadPostalCodes(0);
+                                }
+                            });
+
+                            Log.d("DbWTest", "inserted in database successfully");
+                        }
+                    }
+                }
+            }
+        };
+
+
+        Thread thread2 = new Thread() {
+            @Override
+            public void run() {
+                super.run();
+                synchronized (threadB) {
+                    ContentValues values = new ContentValues();
+                    int progressUpdateCounter = 0;
+
+                    //Insert new values on the db
+                    for (int i = 0; i < itemsToAddPart2.size(); ++i) {
+                        String postalCode = itemsToAddPart2.get(i);
+
+                        String[] columns = postalCode.split(",");
+                        if (columns.length == 0) {
+                            columns = postalCode.toString().split(";");
+                        }
+
+                        if (indexPlaceFinal != -1) {
+                            values.put(WTestDbContract.WTestDbEntry.COLUMN_VALUE, columns[firstPostalCodeFinal] + "-" + columns[secondPostalCodeFinal]);
+                            values.put(WTestDbContract.WTestDbEntry.COLUMN_LOCAL, columns[indexPlaceFinal]);
+                            values.put(WTestDbContract.WTestDbEntry.COLUMN_LOCAL_ASCII, Normalizer.normalize(columns[indexPlaceFinal], Normalizer.Form.NFD)
+                                    .replaceAll("[^\\p{ASCII}]", ""));
+                            wtestDbWritable.insert(WTestDbContract.WTestDbEntry.TABLE_NAME, null, values);
+                            values.clear();
+                            counter++;
+                            progressUpdateCounter++;
+
+                            if (listener != null && progressUpdateCounter == UPDATE_INTERVAL) {
+                                uiThread.post(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        listener.onProgressUpdate(counter, itemCount);
+                                    }
+                                });
+                                progressUpdateCounter = 0;
+                            }
+                        }
+                    }
+                }
+
+                synchronized (threadA) {
+                    synchronized (threadC) {
+                        threadFinished[1] = true;
+
+                        Log.d("DbWTest", "Thread 2 finished");
+
+                        if (threadFinished[0] && threadFinished[1] && threadFinished[2]) {
+                            if (taskWeb != null) {
+                                taskWeb.isRunning = false;
+                            }
+                            uiThread.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    loadPostalCodes(0);
+                                }
+                            });
+
+                            Log.d("DbWTest", "inserted in database successfully");
+                        }
+                    }
+                }
+            }
+        };
+
+
+        Thread thread3 = new Thread() {
+            @Override
+            public void run() {
+                super.run();
+
+                synchronized (threadC) {
+                    ContentValues values = new ContentValues();
+                    int progressUpdateCounter = 0;
+
+                    //Insert new values on the db
+                    for (int i = 0; i < itemsToAddPart3.size(); ++i) {
+                        String postalCode = itemsToAddPart3.get(i);
+
+                        String[] columns = postalCode.split(",");
+                        if (columns.length == 0) {
+                            columns = postalCode.toString().split(";");
+                        }
+
+                        if (indexPlaceFinal != -1) {
+                            values.put(WTestDbContract.WTestDbEntry.COLUMN_VALUE, columns[firstPostalCodeFinal] + "-" + columns[secondPostalCodeFinal]);
+                            values.put(WTestDbContract.WTestDbEntry.COLUMN_LOCAL, columns[indexPlaceFinal]);
+                            values.put(WTestDbContract.WTestDbEntry.COLUMN_LOCAL_ASCII, Normalizer.normalize(columns[indexPlaceFinal], Normalizer.Form.NFD)
+                                    .replaceAll("[^\\p{ASCII}]", ""));
+
+                            wtestDbWritable.insert(WTestDbContract.WTestDbEntry.TABLE_NAME, null, values);
+                            values.clear();
+                            counter++;
+                            progressUpdateCounter++;
+
+                            if (listener != null && progressUpdateCounter == UPDATE_INTERVAL) {
+                                uiThread.post(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        listener.onProgressUpdate(counter, itemCount);
+                                    }
+                                });
+                                progressUpdateCounter = 0;
+                            }
+                        }
+                    }
+                }
+
+                synchronized (threadA) {
+                    synchronized (threadB) {
+                        threadFinished[2] = true;
+
+                        Log.d("DbWTest", "Thread 3 finished");
+
+                        if (threadFinished[0] && threadFinished[1] && threadFinished[2]) {
+                            if (taskWeb != null) {
+                                taskWeb.isRunning = false;
+                            }
+                            uiThread.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    loadPostalCodes(0);
+                                }
+                            });
+
+                            Log.d("DbWTest", "inserted in database successfully");
+                        }
+                    }
+                }
+            }
+        };
+
+        thread1.start();
+        thread2.start();
+        thread3.start();
     }
 
     //AsyncTask to interface with the database in an asyncronous way
@@ -339,7 +527,9 @@ public class PostalCodeManager {
             if (items.size() == 0) {
                 if (!hasError) {
                     if (filter == null || filter.getValue().isEmpty()) {
-                        forceLoadPostalCodes(true);
+                        if (taskWeb == null || !taskWeb.isRunning) {
+                            forceLoadPostalCodes(true);
+                        }
                     } else {
                         if (listener != null) {
                             listener.onDataLoaded(items);
@@ -381,123 +571,86 @@ public class PostalCodeManager {
 
         @Override
         protected List<WTestDbContract.DbItem> doInBackground(String... strings) {
-            /**
-             * Doing this in a certain dynamic way, I'm accessing the datapackage on the github repository so I can get the path to
-             * the .csv file that contains the postal codes.
-             *
-             * I could do it the direct way, but if the owner of the github changes the path or name of file, the app would stop working,
-             * if we code it like this, at least until the owner of the github repository changes the name of the datapackage file, the app will find it's way around
-             */
-            isRunning = true;
-            int progress;
-
-            //Use stringbuilders to increase performance, since Java takes longer with simple "Add" operations to a String
-            StringBuilder result = new StringBuilder();
-
-            //Get the raw content, we don't need all the extra html stuff, only the file
-            String urlString = strings[0].replace("github.com", "raw.githubusercontent.com") + "/master/datapackage.json";
-
-            try {
-
-                //Open the connection
-                URL url = new URL(urlString);
-                urlConnection = (HttpURLConnection) url.openConnection();
-
-                //Get the connection inputStream
-                InputStream in = new BufferedInputStream(urlConnection.getInputStream());
-
-                //With a bit more time, I would validate the HTTP codes correctly of course
-
-                progress = 10;
-                publishProgress(progress);
-
-                //Read the connection data
-                BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    result.append(line);
-                    if (progress <= 30) {
-                        publishProgress(progress++);
-                    }
+            synchronized (threadLock) {
+                if (counter != 0) {
+                    return new ArrayList<>();
                 }
+                /**
+                 * Doing this in a certain dynamic way, I'm accessing the datapackage on the github repository so I can get the path to
+                 * the .csv file that contains the postal codes.
+                 *
+                 * I could do it the direct way, but if the owner of the github changes the path or name of file, the app would stop working,
+                 * if we code it like this, at least until the owner of the github repository changes the name of the datapackage file, the app will find it's way around
+                 */
+                isRunning = true;
+                int progress;
 
-            } catch (Exception e) {
-                if (listener != null) {
-                    uiThread.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            listener.onExceptionData();
-                        }
-                    });
-                }
-                e.printStackTrace();
-                isRunning = false;
-                //STOP METHOD EXECUTION HERE, THERE HAS BEEN AN ERROR CONTACTING THE SYSTEM
-                return null;
-            } finally {
-                urlConnection.disconnect();
-            }
+                //Use stringbuilders to increase performance, since Java takes longer with simple "Add" operations to a String
+                StringBuilder result = new StringBuilder();
 
+                //Get the raw content, we don't need all the extra html stuff, only the file
+                String urlString = strings[0].replace("github.com", "raw.githubusercontent.com") + "/master/datapackage.json";
 
-            String pathToPostalCodes = "";
-
-            try {
-                //Obtain the path to the postal code file from the received JSON Object
-                JSONObject datapackage = new JSONObject(result.toString());
-
-                JSONArray arrayData = datapackage.getJSONArray("resources");
-
-                for (int i = 0; i < arrayData.length(); ++i) {
-                    if (arrayData.getJSONObject(i).getString("name").equals(RESOURCE_NAME)) {
-                        pathToPostalCodes = arrayData.getJSONObject(i).getString("path");
-                        break;
-                    }
-                }
-                progress = 35;
-                publishProgress(progress);
-            } catch (JSONException e) {
-                e.printStackTrace();
-                if (listener != null) {
-                    uiThread.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            listener.onExceptionData();
-                        }
-                    });
-                }
-                isRunning = false;
-                //STOP METHOD EXECUTION HERE, WRONG TYPE OF DATA
-                return null;
-            }
-
-            ArrayList<WTestDbContract.DbItem> postalCodes = new ArrayList<>();
-
-            //Check if we have a path, if we do have a path, connect once again to the repository and download the file that contains all postal codes
-            //It's a big file, to be expected
-            if (!pathToPostalCodes.isEmpty()) {
-                StringBuilder realResult = new StringBuilder();
-
-                urlString = strings[0].replace("github.com", "raw.githubusercontent.com") + "/master/" + pathToPostalCodes;
-
-                InputStream in;
-                ArrayList<String> lines = new ArrayList<>();
                 try {
 
                     //Open the connection
                     URL url = new URL(urlString);
                     urlConnection = (HttpURLConnection) url.openConnection();
 
-                    progress = 40;
-                    publishProgress(progress);
-                    in = new BufferedInputStream(urlConnection.getInputStream());
+                    //Get the connection inputStream
+                    InputStream in = new BufferedInputStream(urlConnection.getInputStream());
 
+                    //With a bit more time, I would validate the HTTP codes correctly of course
+
+                    progress = 10;
+                    publishProgress(progress);
+
+                    //Read the connection data
                     BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+
                     String line;
                     while ((line = reader.readLine()) != null) {
-                        lines.add(line);
+                        result.append(line);
+                        if (progress <= 30) {
+                            publishProgress(progress++);
+                        }
                     }
+
                 } catch (Exception e) {
+                    if (listener != null) {
+                        uiThread.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                listener.onExceptionData();
+                            }
+                        });
+                    }
+                    e.printStackTrace();
+                    isRunning = false;
+                    //STOP METHOD EXECUTION HERE, THERE HAS BEEN AN ERROR CONTACTING THE SYSTEM
+                    return null;
+                } finally {
+                    urlConnection.disconnect();
+                }
+
+
+                String pathToPostalCodes = "";
+
+                try {
+                    //Obtain the path to the postal code file from the received JSON Object
+                    JSONObject datapackage = new JSONObject(result.toString());
+
+                    JSONArray arrayData = datapackage.getJSONArray("resources");
+
+                    for (int i = 0; i < arrayData.length(); ++i) {
+                        if (arrayData.getJSONObject(i).getString("name").equals(RESOURCE_NAME)) {
+                            pathToPostalCodes = arrayData.getJSONObject(i).getString("path");
+                            break;
+                        }
+                    }
+                    progress = 35;
+                    publishProgress(progress);
+                } catch (JSONException e) {
                     e.printStackTrace();
                     if (listener != null) {
                         uiThread.post(new Runnable() {
@@ -508,25 +661,62 @@ public class PostalCodeManager {
                         });
                     }
                     isRunning = false;
-                    //STOP METHOD EXECUTION HERE, WRONG PATH
+                    //STOP METHOD EXECUTION HERE, WRONG TYPE OF DATA
                     return null;
-                } finally {
-                    //Always disconnect from the server;
-                    urlConnection.disconnect();
                 }
 
-                updateDatabaseWithNewData(lines);
+                ArrayList<WTestDbContract.DbItem> postalCodes = new ArrayList<>();
 
-                postalCodes.clear();
+                //Check if we have a path, if we do have a path, connect once again to the repository and download the file that contains all postal codes
+                //It's a big file, to be expected
+                if (!pathToPostalCodes.isEmpty()) {
+                    StringBuilder realResult = new StringBuilder();
 
-                isRunning = false;
+                    urlString = strings[0].replace("github.com", "raw.githubusercontent.com") + "/master/" + pathToPostalCodes;
 
-                //Inform the PostalManager to load data for the subscribed Fragment
-                loadPostalCodes(false, 0);
+                    InputStream in;
+                    ArrayList<String> lines = new ArrayList<>();
+                    try {
 
+                        //Open the connection
+                        URL url = new URL(urlString);
+                        urlConnection = (HttpURLConnection) url.openConnection();
+
+                        progress = 40;
+                        publishProgress(progress);
+                        in = new BufferedInputStream(urlConnection.getInputStream());
+
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            lines.add(line);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        if (listener != null) {
+                            uiThread.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    listener.onExceptionData();
+                                }
+                            });
+                        }
+                        isRunning = false;
+                        //STOP METHOD EXECUTION HERE, WRONG PATH
+                        return null;
+                    } finally {
+                        //Always disconnect from the server;
+                        urlConnection.disconnect();
+                    }
+
+                    updateDatabaseWithNewData(lines);
+
+                    postalCodes.clear();
+
+                }
+
+                return postalCodes;
             }
-
-            return postalCodes;
         }
     }
 

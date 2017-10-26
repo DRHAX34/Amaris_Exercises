@@ -6,6 +6,7 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.View;
 import android.widget.EditText;
 
 import com.emanuel.amaris.wtest.wtest.Adapters.ExerciseAdapter;
@@ -122,34 +123,52 @@ public class FragmentExercise1 extends AppFragment {
                     //If the data is being fetched for the first time, we don't need to maintain scroll state, just set the list to the adapter
                     //and hide the loading screen
                     if (dataWasForced) {
-                        recyclerAdapter.setAdapterContent(itemsToShow, true);
-                        recyclerAdapter.setLoading(false);
+                        //Check if activity is still selected or if this fragment is selected
+                        try {
+                            recyclerAdapter.setAdapterContent(itemsToShow, true);
+                            recyclerAdapter.setLoading(false);
+                        } catch (IllegalStateException ex) {
+                            ex.printStackTrace();
+                            //Activity or fragment is no longer visible
+                        } catch (NullPointerException ex) {
+                            ex.printStackTrace();
+                            //Activity or fragment is no longer visible
+                        }
                         dataWasForced = false;
                     } else {
+                        ArrayList<ExerciseAdapter.itemTemplate> itemsForAdapter = new ArrayList<ExerciseAdapter.itemTemplate>();
+
+                        //Add the items to the existing adapter content
+                        itemsForAdapter.addAll(adapterContent);
 
                         // If the data is being added to the adapter, we need to maintain scroll state so the user doesn't get jerked up to the start
                         // Remove the icon for loading and add the items
-                        if (adapterContent.size() != 0 && adapterContent.get(adapterContent.size() - 1).getViewType() == ExerciseAdapter.VIEW_TYPE_LOADING) {
-                            adapterContent.remove(adapterContent.size() - 1);
+                        if (itemsForAdapter.size() != 0 && itemsForAdapter.get(itemsForAdapter.size() - 1).getViewType() == ExerciseAdapter.VIEW_TYPE_LOADING) {
+                            itemsForAdapter.remove(itemsForAdapter.size() - 1);
                         }
 
-                        //Add the items to the existing adapter content
-                        adapterContent.addAll(itemsToShow);
+                        itemsForAdapter.addAll(itemsToShow);
 
-                        //Hide the loading screen
-                        if (recyclerAdapter.isLoading()) {
-                            recyclerAdapter.setLoading(false);
+                        //Check if activity is still selected or if this fragment is selected
+                        try {
+                            //Hide the loading screen
+                            if (recyclerAdapter.isLoading()) {
+                                recyclerAdapter.setLoading(false);
+                            }
+
+                            //Set the content + newly added items as the adapter content
+                            recyclerAdapter.setAdapterContent(itemsForAdapter, false);
+                        } catch (IllegalStateException ex) {
+                            ex.printStackTrace();
+                            //Activity or fragment is no longer visible
+                        } catch (NullPointerException ex) {
+                            ex.printStackTrace();
+                            //Activity or fragment is no longer visible
                         }
-
-                        //Set the content + newly added items as the adapter content
-                        recyclerAdapter.setAdapterContent(adapterContent, false);
                     }
 
                     //Inform the recyclerview listener that data is no longer loading
                     dataIsLoading = false;
-
-                    //Enable search, in case we disabled it
-                    searchText.setEnabled(true);
                 }
 
                 //This method is executed before the data is fetched from either the DB or the web
@@ -157,11 +176,11 @@ public class FragmentExercise1 extends AppFragment {
                 public void onPreLoadData(boolean isCaching) {
                     if (!dataIsLoading) {
                         recyclerAdapter.setLoading(true);
-                    }
-                    if (isCaching) {
-                        recyclerAdapter.setLoadingString(getContext().getString(R.string.pls_wait_data_caching));
-                    } else {
-                        recyclerAdapter.setLoadingString(getContext().getString(R.string.pls_wait_data_loading));
+                        if (isCaching) {
+                            recyclerAdapter.setLoadingString(getContext().getString(R.string.pls_wait_data_caching));
+                        } else {
+                            recyclerAdapter.setLoadingString(getContext().getString(R.string.pls_wait_data_loading));
+                        }
                     }
                 }
 
@@ -201,9 +220,6 @@ public class FragmentExercise1 extends AppFragment {
                 }
             });
 
-            //Call the manager to load the Postal Codes to show on the RecyclerView
-            manager.loadPostalCodes(false, 0);
-
             //This is needed in order to load more data as soon as the user arrived at the end of the recyclerview
             //We don't need to load all data at once, so we load dynamically 15 items each time
             fragmentRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -211,12 +227,15 @@ public class FragmentExercise1 extends AppFragment {
                 public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
                     super.onScrollStateChanged(recyclerView, newState);
 
+                    int lastItemPosition = ((LinearLayoutManager) recyclerView.getLayoutManager()).findLastVisibleItemPosition();
+                    View lastItem = ((LinearLayoutManager) recyclerView.getLayoutManager()).findViewByPosition(lastItemPosition);
+
                     //Check if we arrived at the end of the recycler view and if data is already loading,
                     //if not, load the data
-                    if (!recyclerView.canScrollVertically(1) && (!recyclerAdapter.isLoading() && !dataIsLoading)) {
+                    if (!(lastItem != null && lastItem.findViewById(R.id.loadingLayout) != null) && (!recyclerAdapter.isLoading() && !dataIsLoading)) {
                         dataIsLoading = true;
 
-                        manager.loadPostalCodes(false, recyclerAdapter.getAdapterContent().size());
+                        manager.loadPostalCodes(recyclerAdapter.getAdapterContent().size());
                     }
                 }
             });
@@ -248,9 +267,18 @@ public class FragmentExercise1 extends AppFragment {
                     dataIsLoading = false;
 
                     //Just call this method with filter set and the items will be loaded according to the filter
-                    manager.loadPostalCodes(false, 0);
+                    manager.loadPostalCodes(0);
                 }
             });
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        if (manager != null) {
+            manager.loadPostalCodes(0);
         }
     }
 }

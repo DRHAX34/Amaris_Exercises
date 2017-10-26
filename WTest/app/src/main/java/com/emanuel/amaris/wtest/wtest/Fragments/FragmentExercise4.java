@@ -45,36 +45,38 @@ public class FragmentExercise4 extends AppFragment {
         fragmentWebView = getFragmentView().findViewById(R.id.exercise_4_webview);
         progressbar = getFragmentView().findViewById(R.id.progressbar);
 
-        Bundle webState = null;
+        if (fragmentWebView != null) {
+            Bundle webState = null;
 
-        if (getContext() != null) {
-            MainActivity activity = (MainActivity) getContext();
-            app = (WTestApplication) activity.getApplication();
-            webState = app.getWebStateBundle();
-        }
+            if (getContext() != null) {
+                MainActivity activity = (MainActivity) getContext();
+                app = (WTestApplication) activity.getApplication();
+                webState = app.getWebStateBundle();
+            }
 
-        if (webviewClient == null) {
-            //Load the webview and set the webview client
-            webviewClient = new WebViewClient();
-            fragmentWebView.setWebViewClient(new Callback());
-            fragmentWebView.setWebChromeClient(new WebChromeClient() {
-                public void onProgressChanged(WebView view, int progress) {
-                    //Make the bar disappear after URL is loaded, and changes string to Loading...
-                    progressbar.setProgress(progress); //Make the bar disappear after URL is loaded
+            if (webviewClient == null) {
+                //Load the webview and set the webview client
+                webviewClient = new WebViewClient();
+                fragmentWebView.setWebViewClient(new Callback());
+                fragmentWebView.setWebChromeClient(new WebChromeClient() {
+                    public void onProgressChanged(WebView view, int progress) {
+                        //Make the bar disappear after URL is loaded, and changes string to Loading...
+                        progressbar.setProgress(progress); //Make the bar disappear after URL is loaded
 
-                    // Return the app name after finish loading
-                    if (progress == 100)
-                        progressbar.setVisibility(ProgressBar.GONE);
-                    else
-                        progressbar.setVisibility(ProgressBar.VISIBLE);
-                }
-            });
-            fragmentWebView.getSettings().setJavaScriptEnabled(true);
-            if (webState == null)
-                //If there is no saved state from before, just load the URL
-                fragmentWebView.loadUrl(BuildConfig.WEBSITE_TO_SHOW);
-            else
-                fragmentWebView.restoreState(webState);
+                        // Return the app name after finish loading
+                        if (progress == 100)
+                            progressbar.setVisibility(ProgressBar.GONE);
+                        else
+                            progressbar.setVisibility(ProgressBar.VISIBLE);
+                    }
+                });
+                fragmentWebView.getSettings().setJavaScriptEnabled(true);
+                if (webState == null)
+                    //If there is no saved state from before, just load the URL
+                    fragmentWebView.loadUrl(BuildConfig.WEBSITE_TO_SHOW);
+                else
+                    fragmentWebView.restoreState(webState);
+            }
         }
     }
 
@@ -82,10 +84,12 @@ public class FragmentExercise4 extends AppFragment {
     public void onPause() {
         super.onPause();
         //Save the webstate is it was loaded
-        Bundle webstate = new Bundle();
-        if (hasFinishedLoading) {
-            fragmentWebView.saveState(webstate);
-            app.setWebStateBundle(webstate);
+        if (fragmentWebView != null) {
+            Bundle webstate = new Bundle();
+            if (hasFinishedLoading) {
+                fragmentWebView.saveState(webstate);
+                app.setWebStateBundle(webstate);
+            }
         }
     }
 

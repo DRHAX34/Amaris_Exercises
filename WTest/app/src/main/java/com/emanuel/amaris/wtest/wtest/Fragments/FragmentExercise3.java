@@ -44,7 +44,8 @@ public class FragmentExercise3 extends AppFragment {
     @Override
     public void onPause() {
         super.onPause();
-        app.setExercise3Items((ArrayList<ExerciseAdapter.itemTemplate>) recyclerAdapter.getAdapterContent());
+        if (recyclerAdapter != null)
+            app.setExercise3Items((ArrayList<ExerciseAdapter.itemTemplate>) recyclerAdapter.getAdapterContent());
     }
 
     //Method to be able to access the fragment views without repeating the same boilerplate code all over again

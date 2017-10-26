@@ -226,13 +226,19 @@ public class ExerciseAdapter extends RecyclerView.Adapter {
 
     //Set tje adapter content
     public void setAdapterContent(List<itemTemplate> adapterContent, boolean resetScroll) {
+        int previousAdapterCount = this.adapterContent.size();
+
+        if (previousAdapterCount != 0) {
+            previousAdapterCount--;
+        }
+
         this.adapterContent = adapterContent;
 
         //Since it's in our interest not to always reset the scroll position, just notify the item range changed
         if (resetScroll)
             notifyDataSetChanged();
         else
-            notifyItemRangeChanged(0, this.adapterContent.size());
+            notifyItemRangeChanged(previousAdapterCount, this.adapterContent.size());
     }
 
     //View Holder for our Exercise Adapter, this will fetch all the views from the inflated layout and keep it so the recyclerview can recycle the views.

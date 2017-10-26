@@ -19,3 +19,6 @@ There are definitely things that need to improve in this exercise, mainly the fo
 Well, as they all say:
 
 > There is never enough available time for doing all the things we want, but we do have to make the most of the time we have.
+
+## Detected bugs
+1. Exercise 1 caching seems to run two times

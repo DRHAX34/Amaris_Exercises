@@ -1,7 +1,6 @@
 package com.emanuel.amaris.wtest.wtest.Fragments;
 
 import android.os.Bundle;
-import android.support.annotation.Nullable;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -13,8 +12,14 @@ import com.emanuel.amaris.wtest.wtest.WTestApplication;
 
 import java.util.ArrayList;
 
+/**
+ * Welcome to the fragment for exercise 3, this fragment is here with the purpose of demonstrating my skills in Android Development.
+ * For me, this was an average fragment to make, not difficult but not too easy as the 4th exercise.
+ */
 public class FragmentExercise3 extends AppFragment {
 
+
+    //Constant necessary to be able to identify this fragment
     public static final String FRAGMENT_TAG = "Exercise3Tag";
 
     public static final int TYPE_TEXT = 0;
@@ -37,16 +42,13 @@ public class FragmentExercise3 extends AppFragment {
     }
 
     @Override
-    public void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-    }
-
-    @Override
     public void onPause() {
         super.onPause();
         app.setExercise3Items((ArrayList<ExerciseAdapter.itemTemplate>) recyclerAdapter.getAdapterContent());
     }
 
+    //Method to be able to access the fragment views without repeating the same boilerplate code all over again
+    //Saves time and makes a better code organization
     @Override
     public void onViewAvailable(Bundle savedInstanceState) {
 

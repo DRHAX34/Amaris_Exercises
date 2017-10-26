@@ -1,7 +1,5 @@
 package com.emanuel.amaris.wtest.wtest.Fragments;
 
-import android.content.Context;
-import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.LayoutRes;
 import android.support.annotation.Nullable;
@@ -29,9 +27,6 @@ public abstract class AppFragment extends Fragment {
     @LayoutRes
     protected int fragmentLayoutResId = -1;
 
-    //Allows the activity to interact with the Fragment or vice-versa
-    private AppFragment.OnFragmentInteractionListener mListener;
-
     //This is a method that was created so the main fragments can access the View
     public View getFragmentView() {
         return fragmentView;
@@ -41,14 +36,19 @@ public abstract class AppFragment extends Fragment {
         this.fragmentView = view;
     }
 
-    /*This method was created to set the layout res id that we will use to inflate the layout.
-      No getter was created since we don't need to access the layout res id in the main fragment.
-      Once again, this is the same hint needed for Android Studio to recognize this int is expected to hold a layout id
+    /**
+     *This method was created to set the layout res id that we will use to inflate the layout.
+     *No getter was created since we don't need to access the layout res id in the main fragment.
+     *Once again, this is the same hint needed for Android Studio to recognize this int is expected to hold a layout id
      */
     public void setFragmentLayout(@LayoutRes int resId) {
         this.fragmentLayoutResId = resId;
     }
 
+    /**
+     * Boilerplate code, if this wasn't standardized, it would be present in all fragments.
+     * It would be a nightmare for code organization.
+     */
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
 
@@ -70,24 +70,8 @@ public abstract class AppFragment extends Fragment {
         return getFragmentView();
     }
 
-
-    @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        if (context instanceof OnFragmentInteractionListener) {
-            mListener = (OnFragmentInteractionListener) context;
-        }
-    }
-
-    @Override
-    public void onDetach() {
-        super.onDetach();
-        mListener = null;
-    }
-
+    /**
+     * This method allows us to start messing with the fragments as soon as the view is inflated.
+     */
     public abstract void onViewAvailable(Bundle savedInstanceState);
-
-    public interface OnFragmentInteractionListener {
-        void onFragmentInteraction(Uri webst);
-    }
 }

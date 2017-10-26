@@ -3,13 +3,11 @@ package com.emanuel.amaris.wtest.wtest.WebCode;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
-import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
 import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.Log;
 
 import com.emanuel.amaris.wtest.wtest.SqlLiteDbHelper.WTestDbContract;
 import com.emanuel.amaris.wtest.wtest.SqlLiteDbHelper.WTestDbHelper;
@@ -34,10 +32,11 @@ import java.util.List;
 
 public class PostalCodeManager {
 
+    //Necessary constants
     private final String GITHUB_URL = "https://github.com/centraldedados/codigos_postais";
-
     private final String RESOURCE_NAME = "codigos_postais";
 
+    //Properties
     protected Handler uiThread;
 
     protected GetPostalCodesFromDb taskDb;
@@ -49,6 +48,8 @@ public class PostalCodeManager {
     private PostalCodeEventListener listener;
 
     private WTestDbHelper dbHelper;
+
+    private SQLiteDatabase wtestDbWritable;
 
     private WTestDbContract.Filter filter;
 
@@ -82,17 +83,12 @@ public class PostalCodeManager {
         return dbHelper;
     }
 
-    public long getDbCount() {
-        SQLiteDatabase dbRead = dbHelper.getReadableDatabase();
-
-        long cnt = DatabaseUtils.queryNumEntries(dbRead, WTestDbContract.WTestDbEntry.TABLE_NAME);
-        dbRead.close();
-
-        return cnt;
-    }
 
     //This method will force the update of data from the web repository
     private void forceLoadPostalCodes(boolean firstTime) {
+        if (taskWeb != null && taskWeb.isRunning) {
+            return;
+        }
         taskWeb = new GetPostalCodesFromWeb();
 
         taskWeb.isFirstStart = firstTime;
@@ -113,6 +109,7 @@ public class PostalCodeManager {
         this.filter = filter;
     }
 
+    //Method executed by activities/fragments
     public void loadPostalCodes(boolean forceLoadFromWeb, final int indexToStart) {
         if (taskWeb == null || !taskWeb.isRunning) {
             if (forceLoadFromWeb) {
@@ -133,17 +130,19 @@ public class PostalCodeManager {
         }
     }
 
+    //Update the Db with data from the web repository
     private void updateDatabaseWithNewData(ArrayList<WTestDbContract.DbItem> postalCodes, boolean clearDatabase) {
-        SQLiteDatabase wtestDb = getDbHelper().getWritableDatabase();
+        wtestDbWritable = getDbHelper().getWritableDatabase();
 
-        //Clear the db (cache)
+        //Clear the db because it's basically a cache
+        //Since we are doing the update sequentially, we only need to clean it once, hence the clearDatabase boolean
         if (clearDatabase)
             try {
-                wtestDb.delete(WTestDbContract.WTestDbEntry.TABLE_NAME, "", null);
+                wtestDbWritable.delete(WTestDbContract.WTestDbEntry.TABLE_NAME, "", null);
             } catch (IllegalStateException exception) {
                 //Try to re-open the db helper again
-                wtestDb = getDbHelper().getWritableDatabase();
-                wtestDb.delete(WTestDbContract.WTestDbEntry.TABLE_NAME, "", null);
+                wtestDbWritable = getDbHelper().getWritableDatabase();
+                wtestDbWritable.delete(WTestDbContract.WTestDbEntry.TABLE_NAME, "", null);
             }
 
         ContentValues values = new ContentValues();
@@ -155,11 +154,11 @@ public class PostalCodeManager {
             values.put(WTestDbContract.WTestDbEntry.COLUMN_LOCAL_ASCII, Normalizer.normalize(postalCode.getPlace(), Normalizer.Form.NFD)
                     .replaceAll("[^\\p{ASCII}]", ""));
             try {
-                wtestDb.insert(WTestDbContract.WTestDbEntry.TABLE_NAME, null, values);
+                wtestDbWritable.insert(WTestDbContract.WTestDbEntry.TABLE_NAME, null, values);
             } catch (IllegalStateException exception) {
                 //Try to re-open the db helper again
-                wtestDb = getDbHelper().getWritableDatabase();
-                wtestDb.insert(WTestDbContract.WTestDbEntry.TABLE_NAME, null, values);
+                wtestDbWritable = getDbHelper().getWritableDatabase();
+                wtestDbWritable.insert(WTestDbContract.WTestDbEntry.TABLE_NAME, null, values);
             }
             values.clear();
         }
@@ -167,6 +166,7 @@ public class PostalCodeManager {
         postalCodes.clear();
     }
 
+    //AsyncTask to interface with the database in an asyncronous way
     public class GetPostalCodesFromDb extends AsyncTask<Integer, Integer, List<WTestDbContract.DbItem>> {
 
         boolean hasError = false;
@@ -175,6 +175,7 @@ public class PostalCodeManager {
         protected void onPreExecute() {
             super.onPreExecute();
 
+            //Inform the activity/fragment that we are about to do magic
             if (listener != null) {
                 listener.onPreLoadData(false);
             }
@@ -182,13 +183,17 @@ public class PostalCodeManager {
 
         @Override
         protected List<WTestDbContract.DbItem> doInBackground(Integer... ints) {
+            //Get the database in read only mode
             SQLiteDatabase dbWTest = getDbHelper().getReadableDatabase();
 
+            //Sort by cities in a ascending order
             String sortOrder = " ORDER BY " + WTestDbContract.WTestDbEntry.COLUMN_LOCAL + " ASC";
 
             String whereClause = "";
 
             if (filter != null && !filter.getValue().isEmpty()) {
+
+                //Separate all stuff into their own string, words, normalizedWords and numbers
                 String words = filter.getValue().replaceAll("[0-9,;]+", "").replaceAll("\\s", "%");
 
                 //Remove all accents and weird characters from search
@@ -209,12 +214,17 @@ public class PostalCodeManager {
 
                 if (words.isEmpty()) {
                     if (!numbers.isEmpty()) {
+                        //Only Search numbers then
                         whereClause = "WHERE " + WTestDbContract.WTestDbEntry.COLUMN_VALUE + " LIKE '%" + numbers + "%' ";
                     }
+
+                    //Or don't search nothing at all
                 } else {
+                    //search the name of the cities
                     whereClause = "WHERE " + WTestDbContract.WTestDbEntry.COLUMN_LOCAL + " LIKE '%" + words + "%' OR " +
                             WTestDbContract.WTestDbEntry.COLUMN_LOCAL_ASCII + " LIKE '%" + wordsNormalized + "%' ";
 
+                    //Word search, so we can enter the words without order
                     String[] wordArraySearch = words.split("%");
 
                     if (wordArraySearch.length > 1) {
@@ -238,6 +248,7 @@ public class PostalCodeManager {
 
                     }
 
+                    //if there were numbers in the filter, search the postal codes as well
                     if (!numbers.isEmpty()) {
                         whereClause += " OR " + WTestDbContract.WTestDbEntry.COLUMN_VALUE + " LIKE '%" + numbers + "%' ";
                     }
@@ -248,6 +259,7 @@ public class PostalCodeManager {
 
             Cursor cursor;
             try {
+                //Fetch the data from the DataBase
                 cursor = dbWTest.rawQuery("SELECT DISTINCT " + WTestDbContract.WTestDbEntry.COLUMN_LOCAL + "," + WTestDbContract.WTestDbEntry.COLUMN_VALUE + " FROM " +
                         WTestDbContract.WTestDbEntry.TABLE_NAME + " " + whereClause + " " + sortOrder + " LIMIT 15 OFFSET " + ints[0], null);
             } catch (SQLiteException exception) {
@@ -258,6 +270,7 @@ public class PostalCodeManager {
                 return new ArrayList<>();
             }
 
+            //Fetch the data from the cursor
             List<WTestDbContract.DbItem> items = new ArrayList<>();
             while (cursor.moveToNext()) {
                 WTestDbContract.DbItem item = new WTestDbContract.DbItem(cursor.getString(cursor.getColumnIndex(WTestDbContract.WTestDbEntry.COLUMN_LOCAL)),
@@ -273,6 +286,8 @@ public class PostalCodeManager {
         protected void onPostExecute(List<WTestDbContract.DbItem> items) {
             super.onPostExecute(items);
 
+            //If we have no items, check if there was an error and check if we should load from web
+            //If it was a bad filter, don't load nothing at all and inform the Activity/fragment that there's no data
             if (items.size() == 0) {
                 if (!hasError) {
                     if (filter == null || filter.getValue().isEmpty()) {
@@ -308,6 +323,7 @@ public class PostalCodeManager {
         protected void onPreExecute() {
             super.onPreExecute();
 
+            //Inform the activity/fragment that we're about to do magic
             if (listener != null) {
                 listener.onPreLoadData(true);
             }
@@ -333,16 +349,19 @@ public class PostalCodeManager {
 
             try {
 
+                //Open the connection
                 URL url = new URL(urlString);
                 urlConnection = (HttpURLConnection) url.openConnection();
 
-                Log.d(this.getClass().getSimpleName(), "Connecting to " + urlString);
-
+                //Get the connection inputStream
                 InputStream in = new BufferedInputStream(urlConnection.getInputStream());
+
+                //With a bit more time, I would validate the HTTP codes correctly of course
 
                 progress = 10;
                 publishProgress(progress);
 
+                //Read the connection data
                 BufferedReader reader = new BufferedReader(new InputStreamReader(in));
 
                 String line;
@@ -355,7 +374,12 @@ public class PostalCodeManager {
 
             } catch (Exception e) {
                 if (listener != null) {
-                    listener.onExceptionData();
+                    uiThread.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            listener.onExceptionData();
+                        }
+                    });
                 }
                 e.printStackTrace();
                 isRunning = false;
@@ -369,6 +393,7 @@ public class PostalCodeManager {
             String pathToPostalCodes = "";
 
             try {
+                //Obtain the path to the postal code file from the received JSON Object
                 JSONObject datapackage = new JSONObject(result.toString());
 
                 JSONArray arrayData = datapackage.getJSONArray("resources");
@@ -379,14 +404,17 @@ public class PostalCodeManager {
                         break;
                     }
                 }
-
-                Log.d(this.getClass().getSimpleName(), pathToPostalCodes.isEmpty() ? "No path obtained" : "Path obtained: " + pathToPostalCodes);
                 progress = 35;
                 publishProgress(progress);
             } catch (JSONException e) {
                 e.printStackTrace();
                 if (listener != null) {
-                    listener.onExceptionData();
+                    uiThread.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            listener.onExceptionData();
+                        }
+                    });
                 }
                 isRunning = false;
                 //STOP METHOD EXECUTION HERE, WRONG TYPE OF DATA
@@ -395,81 +423,103 @@ public class PostalCodeManager {
 
             ArrayList<WTestDbContract.DbItem> postalCodes = new ArrayList<>();
 
+            //Check if we have a path, if we do have a path, connect once again to the repository and download the file that contains all postal codes
+            //It's a big file, to be expected
             if (!pathToPostalCodes.isEmpty()) {
                 StringBuilder realResult = new StringBuilder();
 
                 urlString = strings[0].replace("github.com", "raw.githubusercontent.com") + "/master/" + pathToPostalCodes;
 
+                InputStream in;
+                StringBuilder builder = new StringBuilder();
                 try {
+
+                    //Open the connection
                     URL url = new URL(urlString);
                     urlConnection = (HttpURLConnection) url.openConnection();
-                    InputStream in = new BufferedInputStream(urlConnection.getInputStream());
 
                     progress = 40;
                     publishProgress(progress);
+                    in = new BufferedInputStream(urlConnection.getInputStream());
 
                     BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-
-                    int indexPlace = -1;
-                    int firstPostalCode = -1;
-                    int secondPostalCode = -1;
-
-                    final ArrayList<WTestDbContract.DbItem> itemsToAdd = new ArrayList<>();
                     String line;
                     while ((line = reader.readLine()) != null) {
-                        String[] columns = line.split(",");
-                        if (columns.length == 0) {
-                            columns = realResult.toString().split(";");
-                        }
-
-                        if (indexPlace != -1) {
-                            WTestDbContract.DbItem item = new WTestDbContract.DbItem(columns[indexPlace], columns[firstPostalCode] + "-" + columns[secondPostalCode]);
-                            postalCodes.add(item);
-                            itemsToAdd.add(item);
-                            if (itemsToAdd.size() == 30) {
-                                boolean clearDb = postalCodes.size() == 30;
-
-                                //Update the database in the background, taking advantage of all the cores in the device and making already available the data
-                                //Since the data to fetch is too big and it would take too long to show
-                                updateDatabaseWithNewData(itemsToAdd, clearDb);
-
-                                itemsToAdd.clear();
-                            }
-                        } else {
-                            for (int j = 0; j < columns.length; ++j) {
-                                //Search the header for the positions
-                                if (columns[j].equals("localidade")) {
-                                    indexPlace = j;
-                                } else if (columns[j].equals("cod_postal")) {
-                                    firstPostalCode = j;
-                                } else if (columns[j].equals("extensao_cod_postal")) {
-                                    secondPostalCode = j;
-                                }
-                            }
-                        }
+                        builder.append(line + "\n");
                     }
-
-                    if (itemsToAdd.size() > 0) {
-                        boolean clearDb = itemsToAdd.size() == postalCodes.size();
-                        //Update the database in the background, taking advantage of all the cores in the device
-                        updateDatabaseWithNewData(itemsToAdd, clearDb);
-                    }
-
-                    postalCodes.clear();
-
-                    loadPostalCodes(false, 0);
-
                 } catch (Exception e) {
                     e.printStackTrace();
                     if (listener != null) {
-                        listener.onExceptionData();
+                        uiThread.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                listener.onExceptionData();
+                            }
+                        });
                     }
                     isRunning = false;
                     //STOP METHOD EXECUTION HERE, WRONG PATH
                     return null;
                 } finally {
+                    //Always disconnect from the server;
                     urlConnection.disconnect();
                 }
+
+                //Define all the index variables
+                int indexPlace = -1;
+                int firstPostalCode = -1;
+                int secondPostalCode = -1;
+
+                final ArrayList<WTestDbContract.DbItem> itemsToAdd = new ArrayList<>();
+
+                //Separate all the rows and process each one of them
+                String[] lines = builder.toString().split("\n");
+                for (String string : lines) {
+                    String[] columns = string.split(",");
+                    if (columns.length == 0) {
+                        columns = realResult.toString().split(";");
+                    }
+
+                    if (indexPlace != -1) {
+                        WTestDbContract.DbItem item = new WTestDbContract.DbItem(columns[indexPlace], columns[firstPostalCode] + "-" + columns[secondPostalCode]);
+                        postalCodes.add(item);
+                        itemsToAdd.add(item);
+                        if (itemsToAdd.size() == 1000) {
+                            boolean clearDb = postalCodes.size() == 1000;
+
+                            //Update the database in the background, taking advantage of all the cores in the device and making already available the data
+                            //Since the data to fetch is too big and it would take too long to show
+                            updateDatabaseWithNewData(itemsToAdd, clearDb);
+
+                            itemsToAdd.clear();
+                        }
+                    } else {
+                        for (int j = 0; j < columns.length; ++j) {
+                            //Search the header for the positions of each data we need
+                            if (columns[j].equals("localidade")) {
+                                indexPlace = j;
+                            } else if (columns[j].equals("cod_postal")) {
+                                firstPostalCode = j;
+                            } else if (columns[j].equals("extensao_cod_postal")) {
+                                secondPostalCode = j;
+                            }
+                        }
+                    }
+                }
+
+                if (itemsToAdd.size() > 0) {
+                    boolean clearDb = itemsToAdd.size() == postalCodes.size();
+                    //Update the database in the background, taking advantage of all the cores in the device
+                    updateDatabaseWithNewData(itemsToAdd, clearDb);
+                }
+
+                postalCodes.clear();
+
+                isRunning = false;
+
+                //Inform the PostalManager to load data for the subscribed Fragment
+                loadPostalCodes(false, 0);
+
             }
 
             return postalCodes;
@@ -477,6 +527,7 @@ public class PostalCodeManager {
     }
 
     //Always close the db connection
+    //We're running it in this method as a last resort
     @Override
     protected void finalize() throws Throwable {
         try {
@@ -486,6 +537,8 @@ public class PostalCodeManager {
         }
     }
 
+    //This interface is needed to send the events to the fragment/activity that subscribes to them
+    //Each method name is self-explanatory
     public interface PostalCodeEventListener {
 
         void onDataLoaded(List<WTestDbContract.DbItem> postalCodes);

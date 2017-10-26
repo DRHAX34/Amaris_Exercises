@@ -7,7 +7,9 @@
     <string name="search_string">Search</string>
     <string name="no_layout_specified">No layout was specified</string>
     <string name="no_data_loaded">No data was found</string>
-    <string name="error_loading_data">Error loading data from repository</string>
+    <string name="error_loading_data">Can\'t load data from repository, check your Internet Connection</string>
+    <string name="error_loading_image">Can\'t load image, check your Internet Connection</string>
+    <string name="pls_wait_image_loading">Loading image...</string>
     <string name="pls_wait_data_loading">Loading data...</string>
     <string name="pls_wait_data_caching">Loading and caching data from web, please wait...</string>
 

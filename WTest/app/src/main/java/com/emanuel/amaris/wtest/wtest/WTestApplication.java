@@ -11,6 +11,9 @@ import java.util.ArrayList;
  * Created by emanuel on 25-10-2017.
  */
 
+/**
+ * This Application class only holds some items since Google never enjoys having a stable OnSaveInstanceState experience
+ */
 public class WTestApplication extends Application {
 
     private Bundle WebStateBundle;

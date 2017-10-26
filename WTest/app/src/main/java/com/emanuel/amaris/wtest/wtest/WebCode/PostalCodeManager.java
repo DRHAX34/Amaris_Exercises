@@ -180,6 +180,7 @@ public class PostalCodeManager {
                 }
                 values.clear();
                 counter++;
+                progressUpdateCounter++;
 
                 if (listener != null && progressUpdateCounter == 250) {
                     uiThread.post(new Runnable() {

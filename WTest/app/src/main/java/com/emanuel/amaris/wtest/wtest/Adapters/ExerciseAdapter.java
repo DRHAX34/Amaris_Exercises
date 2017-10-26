@@ -37,8 +37,9 @@ public class ExerciseAdapter extends RecyclerView.Adapter {
     //Constants so we can determine which view type should be shown
     public static final int VIEW_TYPE_TEXT = 1;
     public static final int VIEW_TYPE_LOADING = 2;
-    public static final int VIEW_TYPE_NO_DATA = 3;
-    public static final int VIEW_TYPE_PLACEHOLDER = 4;
+    public static final int VIEW_TYPE_LOADING2 = 3;
+    public static final int VIEW_TYPE_NO_DATA = 4;
+    public static final int VIEW_TYPE_PLACEHOLDER = 5;
 
     //The context needed to inflate Views or get other display metrics
     private Context recyclerContext;
@@ -64,6 +65,9 @@ public class ExerciseAdapter extends RecyclerView.Adapter {
             case VIEW_TYPE_LOADING:
                 View loadingView = LayoutInflater.from(recyclerContext).inflate(R.layout.list_item_loading, parent, false);
                 return new LoadingViewHolder(loadingView);
+            case VIEW_TYPE_LOADING2:
+                View loadingView2 = LayoutInflater.from(recyclerContext).inflate(R.layout.list_item_loading2, parent, false);
+                return new LoadingViewHolder2(loadingView2);
             case VIEW_TYPE_PLACEHOLDER:
                 View placeHolderView = LayoutInflater.from(recyclerContext).inflate(R.layout.list_item_placeholder, parent, false);
                 return new PlaceHolderViewHolder(placeHolderView);
@@ -90,11 +94,16 @@ public class ExerciseAdapter extends RecyclerView.Adapter {
             exerciseHolder.itemEditListener.updateItem(null);
             return;
         } else if (isLoadingData) {
-            LoadingViewHolder loadingHolder = (LoadingViewHolder) holder;
-            if (loadingString != null && !loadingString.isEmpty()) {
-                loadingHolder.progressText.setText(loadingString);
-                loadingHolder.progressText.setVisibility(TextView.VISIBLE);
-            } else {
+            if (position == 1) {
+                LoadingViewHolder2 loadingHolder = (LoadingViewHolder2) holder;
+                if (loadingString != null && !loadingString.isEmpty()) {
+                    loadingHolder.progressText.setText(loadingString);
+                    loadingHolder.progressText.setVisibility(TextView.VISIBLE);
+                } else {
+                    loadingHolder.progressText.setVisibility(TextView.GONE);
+                }
+            } else if (position == 0) {
+                LoadingViewHolder loadingHolder = (LoadingViewHolder) holder;
                 loadingHolder.progressText.setVisibility(TextView.GONE);
             }
             return;
@@ -166,7 +175,10 @@ public class ExerciseAdapter extends RecyclerView.Adapter {
     @Override
     public int getItemViewType(int position) {
         if (isLoadingData) {
-            return VIEW_TYPE_LOADING;
+            if (position == 0)
+                return VIEW_TYPE_LOADING;
+            else
+                return VIEW_TYPE_LOADING2;
         }
 
         if (adapterContent.size() == 0) {
@@ -180,7 +192,7 @@ public class ExerciseAdapter extends RecyclerView.Adapter {
     @Override
     public int getItemCount() {
         if (isLoadingData) {
-            return 1;
+            return 2;
         }
 
         if (adapterContent.size() == 0) {
@@ -199,7 +211,7 @@ public class ExerciseAdapter extends RecyclerView.Adapter {
     //Personalize the loading string as we wish
     public void setLoadingString(String loading) {
         this.loadingString = loading;
-        notifyDataSetChanged();
+        notifyItemChanged(1);
     }
 
     //Return if the adapter is in a loading state
@@ -281,6 +293,18 @@ public class ExerciseAdapter extends RecyclerView.Adapter {
         TextView progressText;
 
         public LoadingViewHolder(View itemView) {
+            super(itemView);
+
+            progressText = itemView.findViewById(R.id.progress_text);
+        }
+    }
+
+    //Simple view holder for the loading item
+    public class LoadingViewHolder2 extends RecyclerView.ViewHolder {
+
+        TextView progressText;
+
+        public LoadingViewHolder2(View itemView) {
             super(itemView);
 
             progressText = itemView.findViewById(R.id.progress_text);

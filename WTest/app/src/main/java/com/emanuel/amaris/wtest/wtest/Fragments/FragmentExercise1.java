@@ -35,6 +35,7 @@ public class FragmentExercise1 extends AppFragment {
     //This boolean tells the code that data is being loaded into adapter
     private boolean dataIsLoading;
 
+
     //This manages all the data from the web repository. A more proficcient way to be able to add more values is to use a service, so we are able to get a notification
     //telling the user the progress of the caching (There are about 32000 entries in the .csv file we're getting)
     private PostalCodeManager manager;
@@ -82,7 +83,7 @@ public class FragmentExercise1 extends AppFragment {
             manager = PostalCodeManager.getInstance(getContext(), new PostalCodeManager.PostalCodeEventListener() {
 
                 //This method in this listener is executed as soon as the PostalCodeManager gets it's data
-                //Since we are caching from a 32000 line file, when this is caching with the web, it may take a while
+                //Since we are caching from a 300000+ line file, when this is caching with the web, it may take a while
                 @Override
                 public void onDataLoaded(final List<WTestDbContract.DbItem> postalCodes) {
 
@@ -185,6 +186,18 @@ public class FragmentExercise1 extends AppFragment {
                     recyclerAdapter.setLoading(false);
                     //... and inform the listener that it can update data again
                     dataIsLoading = false;
+                }
+
+                @Override
+                public void onProgressUpdate(int progress, int itemCount) {
+                    if (recyclerAdapter.isLoading()) {
+                        try {
+                            recyclerAdapter.setLoadingString(getString(R.string.pls_wait_data_caching) + " " + getString(R.string.data_caching_progress)
+                                    .replace("$1", String.valueOf(progress)).replace("$2", String.valueOf(itemCount)));
+                        } catch (IllegalStateException ex) {
+                            //Fragment was detached from activity
+                        }
+                    }
                 }
             });
 

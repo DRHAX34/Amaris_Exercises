@@ -12,6 +12,8 @@
     <string name="pls_wait_image_loading">Loading image...</string>
     <string name="pls_wait_data_loading">Loading data...</string>
     <string name="pls_wait_data_caching">Loading and caching data from web, please wait...</string>
+    <string name="data_caching_progress">$1 of $2 cached in database</string>
+    <string name="data_caching_stop">Stop</string>
 
     <string name="third_exercise_normal">Normal Text</string>
     <string name="third_exercise_numeric">Numeric</string>
